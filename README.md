@@ -1,5 +1,6 @@
 # Financial-News-sentiment-analysis
 https://tavish1510-financial-news-sentiment-analysis-app-p1cdmd.streamlit.app/
+<pre>
 **SUMMARY**
 <pre>
   AIM : To develop a transformer based model to analyse financial news sentiment either by direct text input or by scraping the headline via web link.
