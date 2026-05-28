@@ -90,15 +90,23 @@ def train(push_to_hub: bool = False, hub_model_id: str | None = None) -> Trainer
         fp16=torch.cuda.is_available(),
     )
 
-    trainer = Trainer(
+    # `tokenizer=` was renamed to `processing_class=` in transformers>=4.46.
+    # Use whichever the installed version accepts.
+    trainer_kwargs = dict(
         model=model,
         args=training_args,
         train_dataset=encoded["train"],
         eval_dataset=encoded["validation"],
-        tokenizer=tokenizer,
         data_collator=DataCollatorWithPadding(tokenizer),
         compute_metrics=compute_metrics,
     )
+    import inspect
+    if "processing_class" in inspect.signature(Trainer.__init__).parameters:
+        trainer_kwargs["processing_class"] = tokenizer
+    else:
+        trainer_kwargs["tokenizer"] = tokenizer
+
+    trainer = Trainer(**trainer_kwargs)
 
     print("\nTraining...")
     trainer.train()
