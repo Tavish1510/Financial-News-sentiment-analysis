@@ -27,7 +27,7 @@ class SentimentPredictor:
         self._labels = self._build_label_map()
 
     def _build_label_map(self) -> dict[int, str]:
-        """The fallback model uses different id2label than ours — normalize."""
+        """Map model config labels to canonical negative/neutral/positive."""
         cfg_labels = self.model.config.id2label
         normalized = {}
         for idx, raw in cfg_labels.items():
