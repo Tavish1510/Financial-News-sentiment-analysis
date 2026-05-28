@@ -1,20 +1,18 @@
 """
 Financial PhraseBank dataset loader.
 
-The dataset is hosted on HuggingFace as `takala/financial_phrasebank` with
-four agreement-level configurations:
-  - sentences_50agree    (5,842 sentences)
-  - sentences_66agree    (4,217 sentences)
-  - sentences_75agree    (3,453 sentences)
-  - sentences_allagree   (2,264 sentences)
+HuggingFace auto-converts every dataset to Parquet on a side branch called
+`refs/convert/parquet`. We load directly from there to avoid invoking the
+loading script (which is no longer supported in `datasets >= 3.0`).
 
-We use `sentences_75agree` as a good balance between size and label quality.
+Works with any `datasets` version, no `trust_remote_code` needed.
 """
 
 from __future__ import annotations
 
 import pandas as pd
-from datasets import Dataset, DatasetDict, load_dataset
+from datasets import Dataset, DatasetDict
+from huggingface_hub import hf_hub_download
 from sklearn.model_selection import train_test_split
 
 from src.config import LABEL_LIST, SEED
@@ -24,9 +22,14 @@ PHRASEBANK_CONFIG = "sentences_75agree"
 
 
 def load_phrasebank(config: str = PHRASEBANK_CONFIG) -> pd.DataFrame:
-    """Load the Financial PhraseBank dataset from HuggingFace as a DataFrame."""
-    ds = load_dataset("takala/financial_phrasebank", config, trust_remote_code=True)
-    df = ds["train"].to_pandas()
+    """Load Financial PhraseBank from HF's auto-converted Parquet branch."""
+    path = hf_hub_download(
+        repo_id="takala/financial_phrasebank",
+        filename=f"{config}/train/0000.parquet",
+        repo_type="dataset",
+        revision="refs/convert/parquet",
+    )
+    df = pd.read_parquet(path)
     df = df.rename(columns={"sentence": "text"})
     df["label_name"] = df["label"].map({i: l for i, l in enumerate(LABEL_LIST)})
     return df
