@@ -40,9 +40,11 @@ CONFIG_TO_FILENAME = {
     "sentences_allagree": "Sentences_AllAgree.txt",
 }
 
-# Try mirrors in order. ResearchGate is the original source; HF and Kaggle
-# proxy URLs may or may not be present, but trying them is free.
+# Try mirrors in order. HuggingFace's Hub hosts a direct mirror of the ZIP
+# (much more reliable than the ResearchGate original, which 403s bots).
 ZIP_URLS = [
+    "https://huggingface.co/datasets/takala/financial_phrasebank/resolve/main/data/FinancialPhraseBank-v1.0.zip",
+    # Fallback to the original (will probably 403, but tried last in case HF mirror disappears)
     "https://www.researchgate.net/profile/Pekka-Malo/publication/251231364_"
     "FinancialPhraseBank-v10/data/0c96051eee4fb1d56e000000/FinancialPhraseBank-v10.zip",
 ]
