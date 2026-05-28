@@ -90,8 +90,6 @@ def train(push_to_hub: bool = False, hub_model_id: str | None = None) -> Trainer
         fp16=torch.cuda.is_available(),
     )
 
-    # `tokenizer=` was renamed to `processing_class=` in transformers>=4.46.
-    # Use whichever the installed version accepts.
     trainer_kwargs = dict(
         model=model,
         args=training_args,

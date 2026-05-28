@@ -1,17 +1,8 @@
-"""
-Financial PhraseBank dataset loader.
+"""Financial PhraseBank dataset loader.
 
-Strategy: download the original ZIP directly and parse the text file
-ourselves. This bypasses every broken thing in the HuggingFace ecosystem
-for this particular dataset:
-
-  - `datasets>=3.0` blocks the loading script
-  - The auto-Parquet conversion branch was never created (HF's worker
-    can't reach researchgate.net)
-  - The `datasets-server` rows API returns 404 (same reason)
-
-We try several mirrors in order. The file is cached locally on first
-download so subsequent runs are instant.
+Downloads the original ZIP from HuggingFace Hub, extracts the text file,
+parses the `sentence@label` format, and returns a tidy DataFrame.
+The ZIP is cached locally after first download.
 """
 
 from __future__ import annotations
@@ -40,16 +31,12 @@ CONFIG_TO_FILENAME = {
     "sentences_allagree": "Sentences_AllAgree.txt",
 }
 
-# Try mirrors in order. HuggingFace's Hub hosts a direct mirror of the ZIP
-# (much more reliable than the ResearchGate original, which 403s bots).
 ZIP_URLS = [
     "https://huggingface.co/datasets/takala/financial_phrasebank/resolve/main/data/FinancialPhraseBank-v1.0.zip",
-    # Fallback to the original (will probably 403, but tried last in case HF mirror disappears)
     "https://www.researchgate.net/profile/Pekka-Malo/publication/251231364_"
     "FinancialPhraseBank-v10/data/0c96051eee4fb1d56e000000/FinancialPhraseBank-v10.zip",
 ]
 
-# Browser-ish User-Agent — ResearchGate blocks default Python/requests UA
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "

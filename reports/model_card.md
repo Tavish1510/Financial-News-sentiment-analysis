@@ -40,17 +40,17 @@ Split into train / validation / test = 80 / 10 / 10 with stratified sampling on 
 
 ## Evaluation
 
-Held-out test set (10%, stratified). Headline numbers — see `notebooks/03_evaluation.ipynb` for the full breakdown:
+Held-out test set (10%, stratified, n = 345). Full breakdown in `notebooks/03_evaluation.ipynb`.
 
-| Metric | DistilBERT | TF-IDF + Logistic Regression baseline |
-|---|---|---|
-| Accuracy | _fill_ | _fill_ |
-| F1 macro | _fill_ | _fill_ |
-| F1 weighted | _fill_ | _fill_ |
-| Precision (neg) | _fill_ | _fill_ |
-| Recall (neg) | _fill_ | _fill_ |
+| Metric           | DistilBERT (fine-tuned) | TF-IDF + Logistic Regression baseline |
+|------------------|--------------------------|----------------------------------------|
+| Accuracy         | 0.9217                   | 0.7710                                 |
+| F1 macro         | 0.9084                   | 0.7305                                 |
+| F1 weighted      | 0.9222                   | 0.7698                                 |
+| Precision macro  | 0.9140                   | —                                      |
+| Recall macro     | 0.9042                   | —                                      |
 
-The macro F1 is the headline metric since the neutral class dominates and weighted F1 would over-reward correct predictions on the majority class.
+Macro F1 is the headline metric since the neutral class dominates (~62% of test) — weighted F1 would over-reward correct predictions on the majority class.
 
 ## Intended use
 
