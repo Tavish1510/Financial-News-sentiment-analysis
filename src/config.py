@@ -11,7 +11,7 @@ BASE_MODEL = "distilbert-base-uncased"
 
 # HuggingFace Hub repo where the fine-tuned weights are pushed after training.
 # Update this to your own HF Hub user after running the training notebook.
-HF_HUB_REPO = "Tavish1510/distilbert-financial-phrasebank"
+HF_HUB_REPO = "Tavish15100/distilbert-financial-phrasebank"
 
 # Fall back to a public pre-trained financial sentiment model if HF_HUB_REPO
 # is unavailable (so the Streamlit demo still works for anyone cloning).

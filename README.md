@@ -2,7 +2,7 @@
 
 Fine-tuned **DistilBERT** for 3-class sentiment classification (negative / neutral / positive) of financial news. The model is fine-tuned on the **Financial PhraseBank** dataset (Malo et al., 2014), pushed to **HuggingFace Hub**, and deployed via a 4-page **Streamlit** app that supports single-headline prediction, batch analysis, live RSS news scoring, and **attention-based explainability**.
 
-🤗 **Model:** [`Tavish1510/distilbert-financial-phrasebank`](https://huggingface.co/Tavish1510/distilbert-financial-phrasebank)
+🤗 **Model:** [`Tavish15100/distilbert-financial-phrasebank`](https://huggingface.co/Tavish15100/distilbert-financial-phrasebank)
 🌐 **Live demo:** [Streamlit Community Cloud](https://tavish1510-financial-news-sentiment-analysis-app-p1cdmd.streamlit.app/)
 
 ---
@@ -21,7 +21,7 @@ Fine-tuned **DistilBERT** for 3-class sentiment classification (negative / neutr
 └────────────┬─────────────┘
              ▼
 ┌──────────────────────────┐
-│  HuggingFace Hub         │  Tavish1510/distilbert-financial-phrasebank
+│  HuggingFace Hub         │  Tavish15100/distilbert-financial-phrasebank
 │  (model + tokenizer)     │
 └────────────┬─────────────┘
              ▼

@@ -7,7 +7,7 @@
 - **Classes:** 3 — `negative`, `neutral`, `positive`
 - **Tokenizer:** DistilBERT WordPiece, max_length = 128
 - **Author:** Tavish Tayal
-- **HuggingFace Hub:** [`Tavish1510/distilbert-financial-phrasebank`](https://huggingface.co/Tavish1510/distilbert-financial-phrasebank)
+- **HuggingFace Hub:** [`Tavish15100/distilbert-financial-phrasebank`](https://huggingface.co/Tavish15100/distilbert-financial-phrasebank)
 
 ## Training data
 
