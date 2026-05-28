@@ -1,6 +1,6 @@
 transformers>=4.40.0
 torch>=2.2.0
-datasets>=2.18.0
+datasets>=2.18.0,<3.0.0   # 3.x removed dataset-script support that Financial PhraseBank still uses
 accelerate>=0.30.0
 evaluate>=0.4.0
 scikit-learn>=1.4.0
