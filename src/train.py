@@ -123,7 +123,13 @@ def train(push_to_hub: bool = False, hub_model_id: str | None = None) -> Trainer
 
     if push_to_hub:
         trainer.push_to_hub("Fine-tuned DistilBERT on Financial PhraseBank")
-        print(f"\nModel pushed to: https://huggingface.co/{hub_model_id}")
+        from huggingface_hub import whoami
+        try:
+            username = whoami()["name"]
+            full_repo = f"{username}/{hub_model_id}" if "/" not in hub_model_id else hub_model_id
+        except Exception:
+            full_repo = hub_model_id
+        print(f"\nModel pushed to: https://huggingface.co/{full_repo}")
 
     return trainer
 
