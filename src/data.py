@@ -1,20 +1,26 @@
 """
 Financial PhraseBank dataset loader.
 
-We load from HuggingFace's `datasets-server` rows API rather than the
-`datasets` library, because:
-  - `datasets>=3.0` blocks loading scripts (which the original
-    `takala/financial_phrasebank` dataset uses)
-  - The auto-Parquet conversion branch for this dataset is broken (the
-    script downloads from researchgate.net which the conversion worker
-    can't reach reliably)
-  - The rows API works for any indexed dataset, no script execution, no
-    `trust_remote_code`, no version pinning
+Strategy: download the original ZIP directly and parse the text file
+ourselves. This bypasses every broken thing in the HuggingFace ecosystem
+for this particular dataset:
+
+  - `datasets>=3.0` blocks the loading script
+  - The auto-Parquet conversion branch was never created (HF's worker
+    can't reach researchgate.net)
+  - The `datasets-server` rows API returns 404 (same reason)
+
+We try several mirrors in order. The file is cached locally on first
+download so subsequent runs are instant.
 """
 
 from __future__ import annotations
 
-import time
+import io
+import os
+import re
+import zipfile
+from pathlib import Path
 
 import pandas as pd
 import requests
@@ -25,70 +31,117 @@ from src.config import LABEL_LIST, SEED
 
 
 PHRASEBANK_CONFIG = "sentences_75agree"
-ROWS_API = "https://datasets-server.huggingface.co/rows"
-BATCH_SIZE = 100
-MAX_RETRIES = 3
+
+# Map our config name → the filename inside the ZIP
+CONFIG_TO_FILENAME = {
+    "sentences_50agree": "Sentences_50Agree.txt",
+    "sentences_66agree": "Sentences_66Agree.txt",
+    "sentences_75agree": "Sentences_75Agree.txt",
+    "sentences_allagree": "Sentences_AllAgree.txt",
+}
+
+# Try mirrors in order. ResearchGate is the original source; HF and Kaggle
+# proxy URLs may or may not be present, but trying them is free.
+ZIP_URLS = [
+    "https://www.researchgate.net/profile/Pekka-Malo/publication/251231364_"
+    "FinancialPhraseBank-v10/data/0c96051eee4fb1d56e000000/FinancialPhraseBank-v10.zip",
+]
+
+# Browser-ish User-Agent — ResearchGate blocks default Python/requests UA
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
+    ),
+    "Accept": "*/*",
+}
+
+CACHE_DIR = Path.home() / ".cache" / "financial_phrasebank"
+LABEL_MAP = {"negative": 0, "neutral": 1, "positive": 2}
 
 
-def _fetch_batch(dataset_id: str, config: str, split: str, offset: int) -> dict:
-    params = {
-        "dataset": dataset_id,
-        "config": config,
-        "split": split,
-        "offset": offset,
-        "length": BATCH_SIZE,
-    }
+def _download_zip() -> bytes:
+    """Download the FinancialPhraseBank ZIP, trying mirrors in order."""
     last_err = None
-    for attempt in range(MAX_RETRIES):
+    for url in ZIP_URLS:
         try:
-            r = requests.get(ROWS_API, params=params, timeout=30)
+            print(f"Downloading: {url[:80]}...")
+            r = requests.get(url, headers=HEADERS, timeout=120, allow_redirects=True)
             r.raise_for_status()
-            return r.json()
+            content = r.content
+            if len(content) < 10_000:
+                raise RuntimeError(f"Downloaded file too small ({len(content)} bytes) — likely not the ZIP")
+            # Verify it's actually a ZIP
+            if content[:4] != b"PK\x03\x04":
+                raise RuntimeError("Downloaded content is not a ZIP file")
+            print(f"Downloaded {len(content):,} bytes")
+            return content
         except Exception as e:
+            print(f"  -> failed: {e}")
             last_err = e
-            time.sleep(2 ** attempt)
-    raise RuntimeError(f"datasets-server fetch failed: {last_err}")
+    raise RuntimeError(f"All download sources failed. Last error: {last_err}")
+
+
+def _get_zip_bytes() -> bytes:
+    """Return ZIP bytes, using local cache if available."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_path = CACHE_DIR / "FinancialPhraseBank-v1.0.zip"
+
+    if cache_path.exists() and cache_path.stat().st_size > 10_000:
+        return cache_path.read_bytes()
+
+    content = _download_zip()
+    cache_path.write_bytes(content)
+    return content
+
+
+def _parse_text(text: str) -> list[dict]:
+    """Parse the dataset's text format — each line is `sentence@label`."""
+    rows = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or "@" not in line:
+            continue
+        sentence, _, label = line.rpartition("@")
+        sentence = sentence.strip()
+        label = label.strip().lower()
+        if label not in LABEL_MAP or not sentence:
+            continue
+        rows.append({"text": sentence, "label": LABEL_MAP[label]})
+    return rows
 
 
 def load_phrasebank(config: str = PHRASEBANK_CONFIG) -> pd.DataFrame:
-    """Load Financial PhraseBank via HF datasets-server rows API."""
-    rows = []
-    offset = 0
-    total = None
+    """Load Financial PhraseBank by downloading + parsing the original ZIP."""
+    filename = CONFIG_TO_FILENAME.get(config)
+    if filename is None:
+        raise ValueError(f"Unknown config: {config}. Options: {list(CONFIG_TO_FILENAME)}")
 
-    while True:
-        data = _fetch_batch("takala/financial_phrasebank", config, "train", offset)
+    zip_bytes = _get_zip_bytes()
 
-        batch = data.get("rows", [])
-        if not batch:
-            break
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+        # Find the file (it lives inside a FinancialPhraseBank-v1.0/ folder)
+        candidates = [n for n in z.namelist() if n.endswith(filename)]
+        if not candidates:
+            raise RuntimeError(
+                f"{filename} not found in ZIP. Contents: {z.namelist()[:10]}..."
+            )
+        with z.open(candidates[0]) as f:
+            # The file is in latin-1 encoding (it contains €, £, etc.)
+            text = f.read().decode("latin-1")
 
-        for item in batch:
-            rows.append(item["row"])
-
-        total = total or data.get("num_rows_total")
-        offset += len(batch)
-
-        if total is not None and offset >= total:
-            break
-
+    rows = _parse_text(text)
     if not rows:
-        raise RuntimeError(
-            "Could not fetch any rows from HuggingFace datasets-server. "
-            "If this persists, manually upload Sentences_75Agree.txt into "
-            "data/raw/ and use _load_from_local()."
-        )
+        raise RuntimeError(f"No rows parsed from {filename}")
 
     df = pd.DataFrame(rows)
-    df = df.rename(columns={"sentence": "text"})
     df["label_name"] = df["label"].map({i: l for i, l in enumerate(LABEL_LIST)})
-    print(f"Loaded {len(df):,} sentences from datasets-server")
+    print(f"Loaded {len(df):,} sentences from {filename}")
     return df
 
 
 def basic_clean(text: str) -> str:
-    """Lightweight cleaning — preserve case and most punctuation for the
-    transformer; just strip whitespace and collapse internal whitespace."""
+    """Lightweight cleaning — preserve case and most punctuation."""
     if not isinstance(text, str):
         return ""
     text = text.strip()
