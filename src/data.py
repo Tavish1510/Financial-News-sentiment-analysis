@@ -1,37 +1,88 @@
 """
 Financial PhraseBank dataset loader.
 
-HuggingFace auto-converts every dataset to Parquet on a side branch called
-`refs/convert/parquet`. We load directly from there to avoid invoking the
-loading script (which is no longer supported in `datasets >= 3.0`).
-
-Works with any `datasets` version, no `trust_remote_code` needed.
+We load from HuggingFace's `datasets-server` rows API rather than the
+`datasets` library, because:
+  - `datasets>=3.0` blocks loading scripts (which the original
+    `takala/financial_phrasebank` dataset uses)
+  - The auto-Parquet conversion branch for this dataset is broken (the
+    script downloads from researchgate.net which the conversion worker
+    can't reach reliably)
+  - The rows API works for any indexed dataset, no script execution, no
+    `trust_remote_code`, no version pinning
 """
 
 from __future__ import annotations
 
+import time
+
 import pandas as pd
+import requests
 from datasets import Dataset, DatasetDict
-from huggingface_hub import hf_hub_download
 from sklearn.model_selection import train_test_split
 
 from src.config import LABEL_LIST, SEED
 
 
 PHRASEBANK_CONFIG = "sentences_75agree"
+ROWS_API = "https://datasets-server.huggingface.co/rows"
+BATCH_SIZE = 100
+MAX_RETRIES = 3
+
+
+def _fetch_batch(dataset_id: str, config: str, split: str, offset: int) -> dict:
+    params = {
+        "dataset": dataset_id,
+        "config": config,
+        "split": split,
+        "offset": offset,
+        "length": BATCH_SIZE,
+    }
+    last_err = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            r = requests.get(ROWS_API, params=params, timeout=30)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            last_err = e
+            time.sleep(2 ** attempt)
+    raise RuntimeError(f"datasets-server fetch failed: {last_err}")
 
 
 def load_phrasebank(config: str = PHRASEBANK_CONFIG) -> pd.DataFrame:
-    """Load Financial PhraseBank from HF's auto-converted Parquet branch."""
-    path = hf_hub_download(
-        repo_id="takala/financial_phrasebank",
-        filename=f"{config}/train/0000.parquet",
-        repo_type="dataset",
-        revision="refs/convert/parquet",
-    )
-    df = pd.read_parquet(path)
+    """Load Financial PhraseBank via HF datasets-server rows API."""
+    rows = []
+    offset = 0
+    total = None
+
+    while True:
+        data = _fetch_batch("takala/financial_phrasebank", config, "train", offset)
+
+        batch = data.get("rows", [])
+        if not batch:
+            break
+
+        for item in batch:
+            rows.append(item["row"])
+
+        total = total or data.get("num_rows_total")
+        offset += len(batch)
+
+        if total is not None and offset >= total:
+            break
+
+    if not rows:
+        raise RuntimeError(
+            "Could not fetch any rows from HuggingFace datasets-server. "
+            "If this persists, manually upload Sentences_75Agree.txt into "
+            "data/raw/ and use _load_from_local()."
+        )
+
+    df = pd.DataFrame(rows)
     df = df.rename(columns={"sentence": "text"})
     df["label_name"] = df["label"].map({i: l for i, l in enumerate(LABEL_LIST)})
+    print(f"Loaded {len(df):,} sentences from datasets-server")
     return df
 
 
