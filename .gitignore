@@ -1,0 +1,22 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
+.DS_Store
+*.log
+
+# Model weights — pushed to HuggingFace Hub instead
+models/
+checkpoints/
+*.bin
+*.safetensors
+
+# Cached data — regenerable
+data/raw/
+data/cache/
+~/.cache/huggingface/
